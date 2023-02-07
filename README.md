@@ -1,18 +1,33 @@
 # JPA Relationship Lab 1
 
-## Instruction
+## Setup
+
+[Fork and clone](https://github.com/learn-co-curriculum/java-mod-5-jpa-relationship-lab-1) the lab and open the project in IntelliJ.
+
+The lab repository has the required dependencies defined in `pom.xml` 
+and the database configuration is defined in  `persistence.xml`.
+
+1. Use **pgAdmin** to create a new database named `jpalab_db`:   
+   ![create jpalab_db](https://curriculum-content.s3.amazonaws.com/6036/java-mod-5-jpa-lab1/jpalab_db.png)
+2. Check `persistence.xml` (located in src/main/resources/META-INF) to confirm the `hibernate.hbm2ddl.auto` property is set to `create`.
+3. Check `persistence.xml` to confirm the `hibernate.show_sql` property is set to false.
+   You can change this to true if you prefer to see the SQL statements printed to the output, or leave it as false if you only want to see the Java output.
+
+## Entity Relationship Model
 
 You are given the following entity relationship model:
 
-![Country capital one to one relationship diagram](https://curriculum-content.s3.amazonaws.com/6036/java-mod-5-jpa-lab1/lab1_erd.png)
+![Country capital one to one relationship diagram](https://curriculum-content.s3.amazonaws.com/6036/java-mod-5-jpa/jpa_lab1_erd.png)
 
 There is a one-to-one relationship between `Country` and `Capital`.
 A country has one capital city and a capital city belongs to one country. 
 
-The lab repository has the required dependencies defined in the `pom.xml` file
-and the database configuration is defined in the `persistence.xml` file.
+You can see from the ERD that `Country` is assigned to be the owning side of the relationship
+since it stores a foreign key reference to `Capital`.
 
-Open the `Country` class.  Notice it has a field for the capital along with getter and setter methods.
+
+
+Open the `Country` class in the IntelliJ editor.  Notice it has a field for the capital along with getter and setter methods:
 
 ```java
 private Capital capital;
@@ -24,16 +39,14 @@ Open the `Capital` class.  It has a field for the country along with getter and 
 private Country country;
 ```
 
-However, neither class is using JPA to establish the one-to-one relationship.  
-You will update the code to use the `@OneToOne` annotation to implement the relationship.
+Each class defines a field to reference the other class.
+However, neither class is using JPA to establish the one-to-one relationship that must
+be stored in the database.  
 
-1. Use **pgAdmin** to create a new database named `jpalab_db`:   
-   ![create jpalab_db](https://curriculum-content.s3.amazonaws.com/6036/java-mod-5-jpa-lab1/jpalab_db.png)   
-2. Check `persistence.xml` to make sure the `hibernate.hbm2ddl.auto` property is set to `create`.
-3. Run the `JpaCreate.main` method to create the lab schema and populate the tables. 
-   Unfortunately, the program will fail because the relationship
-   between `Country` and `Capital` has not been established using JPA.  If you scroll through the
-   error messages, you'll see an error message about the mapping between Capital and Country:  
+Try running the `JpaCreate.main` method to create the lab schema and populate the tables. 
+Unfortunately, the program will fail because the relationship
+between `Country` and `Capital` has not been established using JPA.  If you scroll through the
+errors, you'll see a message about the missing mapping between Capital and Country:  
 
 ```text
 ...
@@ -42,12 +55,22 @@ Caused by: org.hibernate.MappingException: Could not determine type for: org.exa
 ....
 ```
 
-4. Edit the `Country` class and add the `@OneToOne` annotation for the `capital` field.   
+## Implement one-to-one relationship using JPA
+
+You will update the code to add the `@OneToOne` annotations with appropriate properties
+to implement the relationship between `Country` and `Capital`.
+
+We will make `Country` the owner of the one-to-one relationship.  That means `Capital`
+is on the non-owning side and must use the `mappedBy` attribute to establish the bidirectional relationship.
+
+1. Edit the `Country` class and add the `@OneToOne` annotation for the `capital` field.   
    Set the `fetch` property to `FetchType.LAZY` and set the `cascade` property to `CascadeType.REMOVE`.
-5. Edit the `Capital` class and add the `@OneToOne` annotation for the `country` field.  
-   Set the `mappedBy` property to `capital`.
-6. Run the `JpaCreate.main` method.  The code should create two tables `COUNTRY` and `CAPITAL`.
-7. Use the **pgAdmin** query tool to query the tables.
+2. Edit the `Capital` class and add the `@OneToOne` annotation for the `country` field.  
+   Since `Capital` is on the non-owning side, set the `mappedBy` property to
+   the `capital` field that was assigned in the `Country` class.
+3. Run the `JpaCreate.main` method.  The code should create two tables `COUNTRY` and `CAPITAL`.
+   
+Use the **pgAdmin** query tool to query the tables.
 
 `SELECT * FROM CAPITAL;`
 
@@ -65,20 +88,22 @@ Caused by: org.hibernate.MappingException: Could not determine type for: org.exa
 | 2   | Mexico  | null       |
 
 
-Notice the one-to-one association is stored in the `COUNTRY` table
-as the column `CAPITAL_ID`.  However, the column contains null values
-because we have not yet called the `setCapital` method in `JpaCreate`.
+Notice the one-to-one association is stored as the column `CAPITAL_ID` within the `COUNTRY` table
+(i.e. the entity on the owning side of the relation).  However, the column contains null values
+because we have not yet called the `setCapital` method in `JpaCreate` to establish the relationship
+between objects.
 
-8. Edit `JpaCreate` to set the capital for each country as shown below:
+1. Edit `JpaCreate` to set the capital for each country as shown below:  
 
-```java
-// create country-capital associations
-country1.setCapital(capital1);
-country2.setCapital(capital2);
-```
+   ```java
+   // create country-capital associations
+   country1.setCapital(capital1);
+   country2.setCapital(capital2);
+   ```
 
-9. Run the `JpaCreate.main` method to recreate the tables with the associations. 
-10. Use **pgAdmin** to query the tables:
+2. Run the `JpaCreate.main` method to recreate the tables with the associations. 
+
+3. Use **pgAdmin** to query the tables:
 
 `SELECT * FROM CAPITAL;`
 
@@ -96,10 +121,11 @@ country2.setCapital(capital2);
 | 2   | Mexico  | 4          |
 
 
+## Fetching Data
 
-11. Change the `hibernate.hbm2ddl.auto` property in the `persistence.xml` to `none`
-    before performing read operations. We will query data in the `JpaRead` class using the getter methods.
-12. Edit the `JpaRead` class and add the following code to get and print the countries and capitals:
+1. Change the `hibernate.hbm2ddl.auto` property in the `persistence.xml` to `none`
+   before performing read operations. We will query data in the `JpaRead` class using the getter methods.
+2. Edit the `JpaRead` class and add the following code to get and print the countries and capitals:
 
 ```java
 package org.example;
@@ -138,54 +164,18 @@ public class JpaRead {
 }
 ```
 
-13. Run `JpaRead.main` and confirm the output:
+Run `JpaRead.main` and confirm the output:
 
 ```text
-Hibernate: 
-    select
-        country0_.id as id1_1_0_,
-        country0_.capital_id as capital_3_1_0_,
-        country0_.name as name2_1_0_ 
-    from
-        Country country0_ 
-    where
-        country0_.id=?
 Country{id=1, name='France'}
-Hibernate: 
-    select
-        capital0_.id as id1_0_0_,
-        capital0_.name as name2_0_0_,
-        country1_.id as id1_1_1_,
-        country1_.capital_id as capital_3_1_1_,
-        country1_.name as name2_1_1_ 
-    from
-        Capital capital0_ 
-    left outer join
-        Country country1_ 
-            on capital0_.id=country1_.capital_id 
-    where
-        capital0_.id=?
 Capital{id=3, name='Paris'}
-Hibernate: 
-    select
-        capital0_.id as id1_0_0_,
-        capital0_.name as name2_0_0_,
-        country1_.id as id1_1_1_,
-        country1_.capital_id as capital_3_1_1_,
-        country1_.name as name2_1_1_ 
-    from
-        Capital capital0_ 
-    left outer join
-        Country country1_ 
-            on capital0_.id=country1_.capital_id 
-    where
-        capital0_.id=?
 Capital{id=4, name='Mexico City'}
 Country{id=2, name='Mexico'}
 ```
+## Deleting Data
 
-14. Edit `JpaDelete` to delete the country with id `1`.  This should also cascade the deletion of the capital with id `3`
-    since you set the `cascade` property for the `capital` field to `CascadeType.REMOVE`.
+Edit `JpaDelete` to delete the country with id `1`.  This should also cascade the deletion of the capital with id `3`
+since you set the `cascade` property for the `capital` field to `CascadeType.REMOVE`.
 
 ```java
 package org.example;
@@ -222,46 +212,7 @@ public class JpaDelete {
 }
 ```
 
-
-```text
-Hibernate: 
-    select
-        country0_.id as id1_1_0_,
-        country0_.capital_id as capital_3_1_0_,
-        country0_.name as name2_1_0_ 
-    from
-        Country country0_ 
-    where
-        country0_.id=?
-Hibernate: 
-    select
-        capital0_.id as id1_0_0_,
-        capital0_.name as name2_0_0_,
-        country1_.id as id1_1_1_,
-        country1_.capital_id as capital_3_1_1_,
-        country1_.name as name2_1_1_ 
-    from
-        Capital capital0_ 
-    left outer join
-        Country country1_ 
-            on capital0_.id=country1_.capital_id 
-    where
-        capital0_.id=?
-Hibernate: 
-    delete 
-    from
-        Country 
-    where
-        id=?
-Hibernate: 
-    delete 
-    from
-        Capital 
-    where
-        id=?
-```
-
-15. Use **pgAdmin** to query the tables:
+Use **pgAdmin** to query the tables and confirm the deletion:
 
 `SELECT * FROM CAPITAL;`
 
@@ -277,3 +228,4 @@ Hibernate:
 | 2   | Mexico  | 4          |
 
 
+Save all files before submitting your project.
